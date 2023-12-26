@@ -1,0 +1,91 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                              SuperTrendWTC.mq5 |
+//|                        Copyright 2022, Forex Robot Easy Team    |
+//|                                        https://forexroboteasy.com|
+//+------------------------------------------------------------------+
+
+#property copyright 'Copyright 2022, Forex Robot Easy Team'
+#property link      'https://forexroboteasy.com'
+#property version   '1.00'
+#property strict
+
+// Input parameters
+input int AtrPeriod = 10;       // Period for calculating Average True Range (ATR)
+input double Multiplier = 2.0;  // Multiplier for calculating SuperTrend
+input ENUM_APPLIED_PRICE Price = PRICE_CLOSE;  // Price type to be used
+
+// Global variables
+double SuperTrendBuffer[];
+double AtrBuffer[];
+int trendDirection;
+
+//+------------------------------------------------------------------+
+//| Custom indicator initialization function                         |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+    // Indicator buffers
+    SetIndexBuffer(0, SuperTrendBuffer, INDICATOR_DATA);
+    SetIndexBuffer(1, AtrBuffer, INDICATOR_CALCULATIONS);
+
+    // Indicator parameters
+    SetIndexStyle(0, DRAW_LINE);
+    SetIndexLabel(0, 'SuperTrend');
+    SetIndexDrawBegin(0, AtrPeriod);
+
+    // Initialize trend direction
+    trendDirection = 0;
+
+    return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+int OnCalculate(const int rates_total,
+                const int prev_calculated,
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[])
+{
+    // Calculate ATR
+    ArrayResize(AtrBuffer, rates_total);
+    ArrayInitialize(AtrBuffer, 0);
+
+    for (int i = AtrPeriod; i < rates_total; i++)
+    {
+        double trueRange = MathMax(high[i] - low[i], high[i] - close[i - 1], close[i - 1] - low[i]);
+        AtrBuffer[i] = iMAOnArray(trueRange, AtrBuffer, AtrPeriod, 0, MODE_SMA, i);
+    }
+
+    // Calculate SuperTrend
+    ArrayResize(SuperTrendBuffer, rates_total);
+    ArrayInitialize(SuperTrendBuffer, 0);
+
+    for (int i = AtrPeriod; i < rates_total; i++)
+    {
+        double upperBand = high[i] - Multiplier * AtrBuffer[i];
+        double lowerBand = low[i] + Multiplier * AtrBuffer[i];
+
+        if (trendDirection > 0)
+        {
+            SuperTrendBuffer[i] = MathMax(SuperTrendBuffer[i - 1], upperBand);
+            if (close[i] < SuperTrendBuffer[i])
+                trendDirection = -1;
+        }
+        else
+        {
+            SuperTrendBuffer[i] = MathMin(SuperTrendBuffer[i - 1], lowerBand);
+            if (close[i] > SuperTrendBuffer[i])
+                trendDirection = 1;
+        }
+    }
+
+    return(rates_total);
+}
